@@ -55,14 +55,15 @@ def gradientDescent(x, y, theta0, theta, rate, iprint = False):
     Theta.insert(0, theta0)
     Theta = np.asarray(Theta)
     Theta_old = Theta
-    iterationMax = 3000
-    eps = 1.0e-6
+    iterationMax = 2000
+    eps = 1.0e-3
     counter = 0
     while(True):
         counter += 1
         if (counter > iterationMax):
             break
-        Theta = Theta_old - rate*gradient(x, y, Theta_old[0], Theta_old[1:])
+        trueRate = rate/np.sqrt(counter)
+        Theta = Theta_old - trueRate*gradient(x, y, Theta_old[0], Theta_old[1:])
         diff = Theta - Theta_old
         error = np.sqrt(np.dot(diff, diff))
         if (iprint):
@@ -142,6 +143,8 @@ def crossValidation(df, trainRatio):
     for i in range(len(theta)):
         theta[i] = random.uniform(-1, 1)
     Theta = Newton(x_train, y_train, theta0, theta, True)
+    #rate = 0.02
+    #Theta = gradientDescent(x_train, y_train, theta0, theta, rate, True)
     theta0 = Theta[0]
     theta = Theta[1:]
     prediction = []
@@ -150,6 +153,9 @@ def crossValidation(df, trainRatio):
         prediction.append(sigmoid(x[i], theta0, theta))
         trueLabel.append(str(y[i]))
     printFile(prediction, trueLabel, "logistic_result.txt")
+    ofile = open("Theta.txt", "w")
+    ofile.write(str(Theta) + "\n")
+    ofile.close()
     return prediction, trueLabel
 
 def generateConfusionMatrix(prediction, trueLabel, threshold):
