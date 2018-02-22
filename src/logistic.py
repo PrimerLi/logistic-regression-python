@@ -48,6 +48,18 @@ def gradient(x, y, theta0, theta):
     g = np.asarray(g)
     return g
 
+def toString(Theta):
+    result = "theta0 = "
+    result += str(Theta[0]) + "\n"
+    result += "theta = ["
+    for i in range(1, len(Theta)):
+        if (i < len(Theta) - 1):
+            result += str(Theta[i]) + ", "
+        else:
+            result += str(Theta[i])
+    result += "]\n"
+    return result
+
 def gradientDescent(x, y, theta0, theta, rate, iprint = False):
     assert(len(x) == len(y))
     assert(len(x[0, :]) == len(theta))
@@ -58,19 +70,23 @@ def gradientDescent(x, y, theta0, theta, rate, iprint = False):
     iterationMax = 2000
     eps = 1.0e-3
     counter = 0
+    ofile = open("Theta_records.txt", "w")
     while(True):
         counter += 1
         if (counter > iterationMax):
             break
-        trueRate = rate/np.sqrt(counter)
-        Theta = Theta_old - trueRate*gradient(x, y, Theta_old[0], Theta_old[1:])
+        trueRate = rate#/np.log(counter+1)
+        g = gradient(x, y, Theta_old[0], Theta_old[1:])
+        Theta = Theta_old - trueRate*g
+        ofile.write("counter = " + str(counter) + "\n" + toString(Theta) + "\n")
         diff = Theta - Theta_old
-        error = np.sqrt(np.dot(diff, diff))
+        error = np.linalg.norm(diff) 
         if (iprint):
-            print "Counter = ", counter, ", error = ", error
+            print "Counter = ", counter, ", error = ", error, ", norm of gradient = ", np.linalg.norm(g)
         Theta_old = Theta
         if (error < eps):
             break
+    ofile.close()
     return Theta
 
 def Hessian(x, y, theta0, theta):
@@ -98,6 +114,7 @@ def Newton(x, y, theta0, theta, iprint = False):
     iterationMax = 40
     eps = 1.0e-8
     counter = 0
+    ofile = open("Theta_records.txt", "w")
     while(True):
         counter += 1
         if (counter > iterationMax):
@@ -108,12 +125,14 @@ def Newton(x, y, theta0, theta, iprint = False):
             sys.exit(-1)
         g = gradient(x, y, Theta_old[0], Theta_old[1:])
         Theta = Theta_old - np.linalg.inv(H).dot(g)
+        ofile.write("counter = " + str(counter) + "\n" + toString(Theta) + "\n")
         error = np.linalg.norm(Theta - Theta_old)
         Theta_old = Theta
         if (iprint):
-            print "Counter = ", counter, ", error = ", error
+            print "Counter = ", counter, ", error = ", error, ", norm of gradient = ", np.linalg.norm(g)
         if (error < eps):
             break
+    ofile.close()
     return Theta
 
 def extractFromDataFrame(df):
@@ -138,13 +157,19 @@ def crossValidation(df, trainRatio):
     trainNumber = int(row*trainRatio)
     x_train = x[0:trainNumber]
     y_train = y[0:trainNumber]
-    theta0 = random.uniform(-1, 1)
-    theta = np.zeros(col-1)
-    for i in range(len(theta)):
-        theta[i] = random.uniform(-1, 1)
-    Theta = Newton(x_train, y_train, theta0, theta, True)
-    #rate = 0.02
-    #Theta = gradientDescent(x_train, y_train, theta0, theta, rate, True)
+    if (True):
+        theta0 = random.uniform(-1, 1)
+        theta = np.zeros(col-1)
+        for i in range(len(theta)):
+            theta[i] = random.uniform(-1, 1)
+    else:
+        theta0 = 0.0 
+        theta = [] 
+    if (True):
+        Theta = Newton(x_train, y_train, theta0, theta, True)
+    else:
+        rate = 0.1
+        Theta = gradientDescent(x_train, y_train, theta0, theta, rate, True)
     theta0 = Theta[0]
     theta = Theta[1:]
     prediction = []
@@ -152,7 +177,7 @@ def crossValidation(df, trainRatio):
     for i in range(trainNumber, row):
         prediction.append(sigmoid(x[i], theta0, theta))
         trueLabel.append(str(y[i]))
-    printFile(prediction, trueLabel, "logistic_result.txt")
+    printFile(prediction, trueLabel, "prediction-true-label.txt")
     ofile = open("Theta.txt", "w")
     ofile.write(str(Theta) + "\n")
     ofile.close()
@@ -258,7 +283,7 @@ def main():
     print "Beginning to read in the file ... "
     df = pd.read_csv(inputFileName)
     print "File reading finished. "
-    trainRatio = 0.5
+    trainRatio = 0.8
     prediction, trueLabel = crossValidation(df, trainRatio)
     getROCAndPR(prediction, trueLabel)
     return 0
