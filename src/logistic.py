@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 
+exponentBound = 709
+
 def invertible(A):
     import sys
     (row, col) = A.shape
@@ -11,7 +13,7 @@ def invertible(A):
         sys.exit(-1)
     inverse = np.linalg.inv(A)
     identity = np.diag(np.ones(row))
-    eps = 1.0e-8
+    eps = 1.0e-2
     error = np.linalg.norm(inverse.dot(A) - identity)
     return error < eps
 
@@ -31,7 +33,14 @@ def Loss(x, y, theta0, theta):
     numberOfSamples = len(x)
     result = 0.0
     for row in range(len(x)):
-        result += y[row]*np.log(1 + np.exp(theta0 + theta.dot(x[row, :]))) + (1 - y[row])*np.log(1 + np.exp(-theta0 - theta.dot(x[row, :])))
+        w = theta0 + theta.dot(x[row, :])
+        if (abs(w) <= exponentBound):
+            result += y[row]*np.log(1 + np.exp(w)) + (1 - y[row])*np.log(1 + np.exp(-w))
+        else:
+            if (w > exponentBound):
+                result += y[row]*w
+            else:
+                result += (1 - y[row])*(-w)
     return result
 
 def gradient(x, y, theta0, theta):
@@ -39,10 +48,24 @@ def gradient(x, y, theta0, theta):
     assert(len(x[0, :]) == len(theta))
     g0 = 0
     for row in range(len(y)):
-        g0 += y[row]*(1.0)/(1.0 + np.exp(-theta0 - theta.dot(x[row, :]))) + (1 - y[row])*(-1)/(1 + np.exp(theta0 + theta.dot(x[row, :])))
+        w = theta0 + theta.dot(x[row, :])
+        if (abs(w) <= exponentBound):
+            g0 += y[row]*(1.0)/(1.0 + np.exp(-w)) + (1 - y[row])*(-1)/(1 + np.exp(w))
+        else:
+            if (w > exponentBound):
+                g0 += y[row]
+            else:
+                g0 += (1 - y[row])*(-1)
     g = np.zeros(len(theta))
     for row in range(len(y)):
-        g = g + y[row]/(1 + np.exp(-theta0 - theta.dot(x[row, :])))*x[row, :] + (1 - y[row])/(1 + np.exp(theta0 + theta.dot(x[row, :])))*(-x[row, :])
+        w = theta0 + theta.dot(x[row, :])
+        if (abs(w) <= exponentBound):
+            g = g + y[row]/(1 + np.exp(-w))*x[row, :] + (1 - y[row])/(1 + np.exp(w))*(-x[row, :])
+        else:
+            if (w > exponentBound):
+                g = g + y[row]*x[row, :]
+            else:
+                g = g + (1 - y[row])*(-x[row, :])
     g = list(g)
     g.insert(0, g0)
     g = np.asarray(g)
@@ -67,8 +90,8 @@ def gradientDescent(x, y, theta0, theta, rate, iprint = False):
     Theta.insert(0, theta0)
     Theta = np.asarray(Theta)
     Theta_old = Theta
-    iterationMax = 2000
-    eps = 1.0e-3
+    iterationMax = 10000
+    eps = 1.0e-8
     counter = 0
     ofile = open("Theta_records.txt", "w")
     while(True):
@@ -95,12 +118,25 @@ def Hessian(x, y, theta0, theta):
     dimension = len(theta) + 1
     H = np.zeros((dimension, dimension))
     for i in range(len(y)):
-        H = H + (1.0/(2*np.cosh(0.5*(theta0 + theta.dot(x[i, :]))))**2)*toMatrix(x[i, :])
+        w = theta0 + theta.dot(x[i, :])
+        if (abs(w) <= exponentBound):
+            H = H + (1.0/(2*np.cosh(0.5*w))**2)*toMatrix(x[i, :])
+        else:
+            pass 
     return H
 
 def sigmoid(x, theta0, theta):
     assert(len(x) == len(theta))
-    return 1.0/(1 + np.exp(theta0 + theta.dot(x)))
+    w = theta0 + theta.dot(x)
+    result = 0
+    if (abs(w) <= exponentBound):
+        result = 1.0/(1 + np.exp(w))
+    else:
+        if (w > exponentBound):
+            result = 0.0
+        else:
+            result = 1.0
+    return result
 
 def Newton(x, y, theta0, theta, iprint = False):
     import sys
@@ -148,6 +184,39 @@ def printFile(x, y, outputFileName):
         ofile.write(str(x[i]) + ", " + str(y[i]) + "\n")
     ofile.close()
 
+def train(df, useInitialTheta = False, useNewton = True):
+    import random
+    (row, col) = df.shape
+    x = df.values[:, 0:-1]
+    y = df.values[:, -1]
+    if (useInitialTheta):
+        theta0 = 0
+        theta = []
+        theta = np.asarray(theta)
+    else:
+        bound = 0.3
+        theta0 = random.uniform(-bound, bound)
+        theta = np.zeros(col - 1)
+        for i in range(len(theta)):
+            theta[i] = random.uniform(-bound, bound)
+    if (useNewton):
+        Theta = Newton(x, y, theta0, theta, True)
+    else:
+        rate = 0.01
+        Theta = gradientDescent(x, y, theta0, theta, True)
+    return Theta
+
+def predict(testData, Theta):
+    (row, col) = testData.shape
+    theta0 = Theta[0]
+    theta = Theta[1:]
+    x = testData.values[:, 0:-1]
+    label = testData.values[:, -1]
+    prediction = []
+    for i in range(len(x)):
+        prediction.append(sigmoid(x[i], theta0, theta))
+    printFile(prediction, label, "prediction-label.txt")
+
 def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     assert(trainRatio < 1 and trainRatio > 0)
     import random
@@ -158,19 +227,19 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     x_train = x[0:trainNumber]
     y_train = y[0:trainNumber]
     if (not useInitialTheta):
-        bound = 1.0
+        bound = 1.2
         theta0 = random.uniform(-bound, bound)
         theta = np.zeros(col-1)
         for i in range(len(theta)):
             theta[i] = random.uniform(-bound, bound)
     else:
-        theta0 = 4.20724137852
-        theta = [1.03468934256, 1.05395107516, 1.52921748951, 0.267897784236, -1.00537769189, -1.80721256538, -2.73689779403, 10.5476066578, 2.42696485697, -12.2186559802] 
+        theta0 = -2.17015296562
+        theta = [1.53616673727, 0.111167244918, 0.640863444623, 5.41600748124, 2.18457203328, 14.1195884269, 9.58510914492, 9.80738132842, -10.4598737079, 5.78112749192] 
         theta = np.asarray(theta)
     if (useNewton):
         Theta = Newton(x_train, y_train, theta0, theta, True)
     else:
-        rate = 0.02
+        rate = 0.1
         Theta = gradientDescent(x_train, y_train, theta0, theta, rate, True)
     theta0 = Theta[0]
     theta = Theta[1:]
