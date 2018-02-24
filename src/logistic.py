@@ -75,7 +75,7 @@ def gradientDescent(x, y, theta0, theta, rate, iprint = False):
         counter += 1
         if (counter > iterationMax):
             break
-        trueRate = rate#/np.log(counter+1)
+        trueRate = rate/np.log(counter+1)
         g = gradient(x, y, Theta_old[0], Theta_old[1:])
         Theta = Theta_old - trueRate*g
         ofile.write("counter = " + str(counter) + "\n" + toString(Theta) + "\n")
@@ -148,7 +148,7 @@ def printFile(x, y, outputFileName):
         ofile.write(str(x[i]) + ", " + str(y[i]) + "\n")
     ofile.close()
 
-def crossValidation(df, trainRatio):
+def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     assert(trainRatio < 1 and trainRatio > 0)
     import random
     (row, col) = df.shape
@@ -157,18 +157,20 @@ def crossValidation(df, trainRatio):
     trainNumber = int(row*trainRatio)
     x_train = x[0:trainNumber]
     y_train = y[0:trainNumber]
-    if (True):
-        theta0 = random.uniform(-1, 1)
+    if (not useInitialTheta):
+        bound = 1.0
+        theta0 = random.uniform(-bound, bound)
         theta = np.zeros(col-1)
         for i in range(len(theta)):
-            theta[i] = random.uniform(-1, 1)
+            theta[i] = random.uniform(-bound, bound)
     else:
-        theta0 = 0.0 
-        theta = [] 
-    if (True):
+        theta0 = 4.20724137852
+        theta = [1.03468934256, 1.05395107516, 1.52921748951, 0.267897784236, -1.00537769189, -1.80721256538, -2.73689779403, 10.5476066578, 2.42696485697, -12.2186559802] 
+        theta = np.asarray(theta)
+    if (useNewton):
         Theta = Newton(x_train, y_train, theta0, theta, True)
     else:
-        rate = 0.1
+        rate = 0.02
         Theta = gradientDescent(x_train, y_train, theta0, theta, rate, True)
     theta0 = Theta[0]
     theta = Theta[1:]
@@ -283,22 +285,12 @@ def main():
     print "Beginning to read in the file ... "
     df = pd.read_csv(inputFileName)
     print "File reading finished. "
-    trainRatio = 0.8
-    prediction, trueLabel = crossValidation(df, trainRatio)
+    trainRatio = 0.5
+    useInitialTheta = False
+    useNewton = True
+    prediction, trueLabel = crossValidation(df, trainRatio, useInitialTheta, useNewton)
     getROCAndPR(prediction, trueLabel)
     return 0
-
-def main_test():
-    import random
-    dimension = 6
-    matrix = np.zeros((dimension+1, dimension+1))
-    for i in range(2*dimension):
-        print "i = ", i+1
-        x = np.zeros(dimension)
-        for j in range(len(x)):
-            x[j] = random.uniform(0, 1)
-        matrix = matrix + random.uniform(0, 1)*toMatrix(x)
-        print invertible(matrix)
 
 if __name__ == "__main__":
     import sys
