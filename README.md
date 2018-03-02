@@ -1,4 +1,4 @@
-# logistic-ression-python
+# logistic-regression-python
 
 Logistic regression algorithm
 
