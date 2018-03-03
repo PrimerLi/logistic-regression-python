@@ -254,6 +254,14 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     ofile.close()
     return prediction, trueLabel
 
+
+'''
+    Confusion matrix:
+                        Actual N  |   Actual P
+     Prediction N         TN      |      FN
+     ------------------------------------------------
+     Prediction P         FP      |     TP
+'''
 def generateConfusionMatrix(prediction, trueLabel, threshold):
     assert(len(prediction) == len(trueLabel))
     labelSet = set()
