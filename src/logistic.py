@@ -13,7 +13,7 @@ def invertible(A):
         sys.exit(-1)
     inverse = np.linalg.inv(A)
     identity = np.diag(np.ones(row))
-    eps = 1.0e-2
+    eps = 1.0e-1
     error = np.linalg.norm(inverse.dot(A) - identity)
     return error < eps
 
@@ -147,8 +147,8 @@ def Newton(x, y, theta0, theta, iprint = False):
     Theta.insert(0, theta0)
     Theta = np.asarray(Theta)
     Theta_old = Theta
-    iterationMax = 40
-    eps = 1.0e-8
+    iterationMax = 100
+    eps = 1.0e-7
     counter = 0
     ofile = open("Theta_records.txt", "w")
     while(True):
@@ -157,16 +157,17 @@ def Newton(x, y, theta0, theta, iprint = False):
             break
         H = Hessian(x, y, Theta_old[0], Theta_old[1:])
         if (not invertible(H)):
-            print "Hessian matrix is singular. exiting. "
-            sys.exit(-1)
+            print "Warning: Hessian matrix is singular."
+            #sys.exit(-1)
         g = gradient(x, y, Theta_old[0], Theta_old[1:])
         Theta = Theta_old - np.linalg.inv(H).dot(g)
         ofile.write("counter = " + str(counter) + "\n" + toString(Theta) + "\n")
         error = np.linalg.norm(Theta - Theta_old)
+        normOfGradient = np.linalg.norm(g)
         Theta_old = Theta
         if (iprint):
-            print "Counter = ", counter, ", error = ", error, ", norm of gradient = ", np.linalg.norm(g)
-        if (error < eps):
+            print "Counter = ", counter, ", error = ", error, ", norm of gradient = ", normOfGradient 
+        if (error < eps or normOfGradient < eps):
             break
     ofile.close()
     return Theta
@@ -227,7 +228,7 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     x_train = x[0:trainNumber]
     y_train = y[0:trainNumber]
     if (not useInitialTheta):
-        bound = 1.2
+        bound = 0.3
         theta0 = random.uniform(-bound, bound)
         theta = np.zeros(col-1)
         for i in range(len(theta)):
@@ -239,7 +240,7 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     if (useNewton):
         Theta = Newton(x_train, y_train, theta0, theta, True)
     else:
-        rate = 0.1
+        rate = 0.2
         Theta = gradientDescent(x_train, y_train, theta0, theta, rate, True)
     theta0 = Theta[0]
     theta = Theta[1:]
@@ -254,14 +255,13 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     ofile.close()
     return prediction, trueLabel
 
-
 '''
     Confusion matrix:
                         Actual N  |   Actual P
      Prediction N         TN      |      FN
      ------------------------------------------------
      Prediction P         FP      |     TP
-'''
+''' 
 def generateConfusionMatrix(prediction, trueLabel, threshold):
     assert(len(prediction) == len(trueLabel))
     labelSet = set()
