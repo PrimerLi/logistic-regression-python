@@ -227,6 +227,9 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
     trainNumber = int(row*trainRatio)
     x_train = x[0:trainNumber]
     y_train = y[0:trainNumber]
+    label_set = set(y_train)
+    assert(0 in label_set)
+    assert(1 in label_set)
     if (not useInitialTheta):
         bound = 0.3
         theta0 = random.uniform(-bound, bound)
@@ -294,6 +297,9 @@ def generateConfusionMatrix(prediction, trueLabel, threshold):
     result[1, 1] = truePositive
     return result
 
+def to_string(confusionMatrix):
+    return "\n".join(map(lambda row: "  ".join(map(str, row)), confusionMatrix))
+
 def getPrecision(confusionMatrix):
     (row, col) = confusionMatrix.shape
     assert(row == 2 and col == 2)
@@ -318,6 +324,17 @@ def getFPR(confusionMatrix): # get the fasle positive rate
     eps = 1.0e-10
     return float(falsePositive + eps)/float(falsePositive + trueNegative + eps)
 
+def get_readable_results(confusionMatrix):
+    (row, col) = confusionMatrix.shape
+    assert(row == col and row == 2)
+    true_positive = confusionMatrix[1,1]
+    false_positive = confusionMatrix[1,0]
+    false_negative = confusionMatrix[0,1]
+    eps = 1.0e-10
+    capture_rate = (true_positive + eps)/(true_positive + false_negative + eps)
+    incorrect_slay_rate = (false_positive + eps)/(false_positive + true_positive + eps)
+    return capture_rate, incorrect_slay_rate
+
 def harmonicMean(a, b):
     return 2*a*b/(a + b)
 
@@ -335,10 +352,12 @@ def getROCAndPR(prediction, trueLabel):
         thresholdValues.append(lower + delta*i)
 
     ofile = open("confusion-matrices.txt", "w")
+    confusionMatrices = []
     for threshold in thresholdValues:
         confusionMatrix = generateConfusionMatrix(prediction, trueLabel, threshold)
+        confusionMatrices.append(confusionMatrix)
         ofile.write("threshold = " + str(threshold) + "\n")
-        ofile.write(str(confusionMatrix) + "\n")
+        ofile.write(to_string(confusionMatrix) + "\n")
         precision.append(getPrecision(confusionMatrix))
         recall.append(getRecall(confusionMatrix))
         FPR.append(getFPR(confusionMatrix))
@@ -348,17 +367,33 @@ def getROCAndPR(prediction, trueLabel):
     for i in range(len(precision)):
         F1.append(harmonicMean(precision[i], recall[i]))
     printFile(thresholdValues, F1, "F1_theta.txt")
+    F1_max = F1[0]
+    max_index = 0
+    for i in range(1, len(F1)):
+        if (F1[i] > F1_max):
+            F1_max = F1[i]
+            max_index = i
+    print "F1_max = ", F1_max, ", max index = ", max_index
+    optimal_matrix = confusionMatrices[max_index]
+    print "The corresponding optimal confusion matrix is "
+    print to_string(optimal_matrix)
+    capture_rate, incorrect_slay_rate = get_readable_results(optimal_matrix)
+    print "Capture rate = ", capture_rate
+    print "Incorrect slay rate = ", incorrect_slay_rate
 
 def main():
     import os
     import sys
     import random
 
-    if (len(sys.argv) != 2):
-        print "inputFileName = sys.argv[1]. "
+    if (len(sys.argv) != 3):
+        print "inputFileName = sys.argv[1], trainRatio = sys.argv[2]. "
         return -1
 
     inputFileName = sys.argv[1]
+    trainRatio = float(sys.argv[2])
+    assert(os.path.exists(inputFileName))
+    assert(trainRatio > 0 and trainRatio < 1)
     print "Beginning to read in the file ... "
     df = pd.read_csv(inputFileName)
     print "File reading finished. "
