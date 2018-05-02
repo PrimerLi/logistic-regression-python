@@ -380,6 +380,12 @@ def getROCAndPR(prediction, trueLabel):
     capture_rate, incorrect_slay_rate = get_readable_results(optimal_matrix)
     print "Capture rate = ", capture_rate
     print "Incorrect slay rate = ", incorrect_slay_rate
+    ofile = open("final_results.txt", "w")
+    ofile.write("Optimal confusion matrix: \n")
+    ofile.write(to_string(optimal_matrix) + "\n")
+    ofile.write("Capture rate = " + str(capture_rate) + "\n")
+    ofile.write("Incorrect slay rate = " + str(incorrect_slay_rate) + "\n")
+    ofile.close()
 
 def main():
     import os
