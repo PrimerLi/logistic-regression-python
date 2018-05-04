@@ -403,7 +403,6 @@ def main():
     print "Beginning to read in the file ... "
     df = pd.read_csv(inputFileName)
     print "File reading finished. "
-    trainRatio = 0.5
     useInitialTheta = False
     useNewton = True
     prediction, trueLabel = crossValidation(df, trainRatio, useInitialTheta, useNewton)
