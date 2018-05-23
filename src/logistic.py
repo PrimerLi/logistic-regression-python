@@ -267,11 +267,9 @@ def crossValidation(df, trainRatio, useInitialTheta, useNewton):
 ''' 
 def generateConfusionMatrix(prediction, trueLabel, threshold):
     assert(len(prediction) == len(trueLabel))
-    labelSet = set()
-    for i in range(len(trueLabel)):
-        labelSet.add(trueLabel[i])
-    negativeLabel = "0.0"
-    positiveLabel = "1.0"
+    labelSet = set(trueLabel)
+    negativeLabel = 0
+    positiveLabel = 1
     assert(negativeLabel in labelSet)
     assert(positiveLabel in labelSet)
     assert(len(labelSet) == 2)
@@ -403,10 +401,36 @@ def main():
     print "Beginning to read in the file ... "
     df = pd.read_csv(inputFileName)
     print "File reading finished. "
-    useInitialTheta = False
-    useNewton = True
-    prediction, trueLabel = crossValidation(df, trainRatio, useInitialTheta, useNewton)
-    getROCAndPR(prediction, trueLabel)
+    use_sklearn = True
+    if (not use_sklearn):
+        useInitialTheta = False
+        useNewton = True
+        prediction, trueLabel = crossValidation(df, trainRatio, useInitialTheta, useNewton)
+        getROCAndPR(prediction, trueLabel)
+    else:
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.cross_validation import train_test_split
+        keys = df.keys()
+        features = keys[:-1]
+        print "Spiltting the data ... "
+        X = df[features]
+        y = df[keys[-1]]
+        X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = trainRatio, random_state=0)
+        print "Data splitting finished. \n Training the model ... "
+        model = LogisticRegression()
+        model.fit(X_train, y_train)
+        print "Model training finished. \n Making predictions ... "
+        predictions = model.predict_proba(X_test)
+        predictions = map(lambda x: x[1], predictions)
+        labels = map(lambda x: x, y_test)
+        ofile = open("predictions_labels.csv", "w")
+        ofile.write("prediction,label\n")
+        for i in range(len(predictions)):
+            ofile.write(str(predictions[i]) + "," + str(labels[i]) + "\n")
+        ofile.close()
+        print "Predictions made. \n Printing out the ROC and PR curves ... "
+        getROCAndPR(predictions, labels)
+        print "Done. "
     return 0
 
 if __name__ == "__main__":
